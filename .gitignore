@@ -5,5 +5,6 @@
 .idea/
 ares_pytorch.egg-info/
 detection/coco2017/
+detection/logs/
 detection/work_dirs/
 cache/
