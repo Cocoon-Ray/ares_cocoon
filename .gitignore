@@ -2,3 +2,8 @@
 .DS_Store
 .DS_Store?
 **/.vscode
+.idea/
+ares_pytorch.egg-info/
+detection/coco2017/
+detection/work_dirs/
+cache/
