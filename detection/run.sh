@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=2 python run.py --cfg configs/global_demo.py
+CUDA_VISIBLE_DEVICES=3 python run.py --cfg configs/patch_demo.py --eval_only

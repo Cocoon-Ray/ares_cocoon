@@ -96,6 +96,7 @@ if __name__ == "__main__":
         attack_cfg.attacked_labels = test_dataloader.dataset.kept_labels
 
     attack_cfg.all_classes = test_dataloader.dataset.metainfo['classes']
+    attack_cfg.final_rgb_mode = detector_cfg.model.data_preprocessor.get('bgr_to_rgb', False)
     if local_rank == 0:
         attack_cfg.dump(os.path.join(log_dir, os.path.basename(args.cfg)))
         detector_cfg.dump(os.path.join(log_dir, 'detector_cfg.py'))
@@ -105,9 +106,11 @@ if __name__ == "__main__":
     trainer = Trainer(attack_cfg, attacker, train_dataloader, test_dataloader, evaluator, logger)
     if attack_cfg.attack_mode == 'global':
         trainer.eval(eval_on_clean=True)
+        # trainer.eval(eval_on_clean=False) # for debug
     elif attack_cfg.attack_mode == 'patch':
         if args.eval_only:
             assert attack_cfg.patch.resume_path, 'Adversarial patches path should not be none for eval only mode!'
             trainer.eval(eval_on_clean=True)
+            # trainer.eval(eval_on_clean=True) # for debug
         else:
             trainer.train()

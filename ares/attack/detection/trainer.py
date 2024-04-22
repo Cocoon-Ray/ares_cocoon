@@ -67,7 +67,7 @@ class Trainer():
             preds = returned_dict['preds']
             if save_adv_images:
                 save_images(returned_dict['adv_images'], preds, adv_image_save_dir,
-                            self.cfg.adv_image.with_bboxes)
+                            self.cfg.adv_image.with_bboxes, self.cfg.final_rgb_mode)
             self.evaluator.process(data_samples=preds)
         metrics = self.evaluator.evaluate(len(self.test_dataloader.dataset))
         return metrics
@@ -114,8 +114,8 @@ class Trainer():
                     info += f'loss tv:{loss_tv.item():.2f}  '
                 info += f'time:{batch_time:.1f}s'
                 self.logger.info(info)
-
         self.runtime['epoch_loss'] = epoch_loss
+
     @torch.no_grad()
     def _eval_clean(self):
         """Evaluate detection performance on clean data."""
@@ -131,7 +131,7 @@ class Trainer():
             self.evaluator.process(data_samples=preds)
             if self.cfg.clean_image.save:
                 save_images(images, preds, clean_image_save_dir,
-                            self.cfg.clean_image.with_bboxes)
+                            self.cfg.clean_image.with_bboxes, self.cfg.final_rgb_mode)
         self.evaluator.evaluate(len(self.test_dataloader.dataset))
 
     def before_eval(self):
@@ -155,7 +155,7 @@ class Trainer():
 
         if epoch % self.cfg.patch.save_period == 0:
             model = self.model.module if self.is_distributed else self.model
-            model.save_patch(self.runtime['epoch'], is_best=False)
+            model.save_patch(self.cfg.final_rgb_mode, self.runtime['epoch'], is_best=False)
 
         if epoch % self.cfg.eval_period == 0 and epoch != self.epochs:
             metrics = self.eval(eval_on_clean=False)
@@ -164,7 +164,7 @@ class Trainer():
                 self.runtime['lowest_bbox_mAP'] = metrics['coco/bbox_mAP']
                 self.logger.info('Lowest mAP updated!')
             model = self.model.module if self.is_distributed else self.model
-            model.save_patch(self.runtime['epoch'], is_best=is_best)
+            model.save_patch(self.cfg.final_rgb_mode, self.runtime['epoch'], is_best=is_best)
 
     def before_train(self):
         """Automatically scale learning rate, build optimizer and lr_scheduler before training."""
@@ -188,7 +188,7 @@ class Trainer():
             self.runtime['lowest_bbox_mAP'] = metrics['coco/bbox_mAP']
             self.logger.info('Lowest mAP updated!')
         model = self.model.module if self.is_distributed else self.model
-        model.save_patch(self.runtime['epoch'], is_best=is_best)
+        model.save_patch(self.cfg.final_rgb_mode, self.runtime['epoch'], is_best=is_best)
 
     def before_start(self):
         """Initialization before starting training or evaluating."""

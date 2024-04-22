@@ -8,7 +8,7 @@ from mmengine.structures import InstanceData
 from .patch.patch_applier import PatchApplier
 from .utils import EnableLossCal
 from .utils import normalize, denormalize, main_only
-from .utils import tv_loss, mkdirs_if_not_exists, save_patches_to_images
+from .utils import tv_loss, mkdirs_if_not_exists, save_patches_to_images, save_upatch_to_image
 
 
 class UniversalAttacker(nn.Module):
@@ -133,8 +133,10 @@ class UniversalAttacker(nn.Module):
             attacked_detector_loss = self.filter_loss(detector_losses)
             losses = {'loss_detector': attacked_detector_loss}
             if self.cfg.loss_fn.tv_loss.enable:
-                selected_patch_indices = torch.cat((labels_list)).unique()
-                selected_patches = self.patch[selected_patch_indices]
+                selected_patches = self.patch
+                if not self.cfg.patch.upatch:
+                    selected_patch_indices = torch.cat((labels_list)).unique()
+                    selected_patches = self.patch[selected_patch_indices]
                 loss_tv = tv_loss(selected_patches)
                 loss_tv = torch.max(self.cfg.loss_fn.tv_loss.tv_scale * loss_tv, torch.tensor(self.cfg.loss_fn.tv_loss.tv_thresh).to(loss_tv.device))
                 losses.update({'loss_tv': loss_tv})
@@ -147,7 +149,7 @@ class UniversalAttacker(nn.Module):
 
     def init_for_patch_attack(self):
         '''Initialize adversarial patch, patch applier and attacked labels for patch attack.'''
-        self.patch = self.init_patch(init_mode=self.cfg.patch.init_mode)
+        self.patch = self.init_patch(init_mode=self.cfg.patch.init_mode, upatch=self.cfg.patch.upatch)
         self.patch_applier = PatchApplier(self.cfg.patch)
         self.attacked_labels = self.cfg.get('attacked_labels', None)
         if self.attacked_labels:
@@ -218,7 +220,7 @@ class UniversalAttacker(nn.Module):
         for _, parameter in modules.named_parameters():
             parameter.requires_grad = False
 
-    def init_patch(self, init_mode='gray'):
+    def init_patch(self, init_mode='gray', upatch=False):
         '''Initialize adversarial patch with given init_mode.'''
         assert init_mode in ['gray', 'white', 'black', 'random'], \
             'Expected patch initilization modes are gray, while, ' \
@@ -238,6 +240,8 @@ class UniversalAttacker(nn.Module):
             patch = torch.full((num_classes, 3, height, width), 1.0)
         elif init_mode.lower() == 'black':
             patch = torch.full((num_classes, 3, height, width), 0)
+        if upatch:
+            patch = patch.mean(dim=0, keepdim=True)
         patch = nn.Parameter(patch, requires_grad=True)
         return patch
 
@@ -266,35 +270,67 @@ class UniversalAttacker(nn.Module):
 
     def load_patch(self, patch_path):
         '''Initialize patch with given patch_path'''
-        self.logger.info('Load adversarial patch from path: %s' % patch_path)
-        patches = torch.load(patch_path, map_location=self.device)
-        self.patch = torch.nn.Parameter(patches)
+        patch = torch.load(patch_path, map_location=self.device)
+        if not self.cfg.final_rgb_mode:
+            patch = patch.flip(1)
+        assert patch.ndim == 4, 'Initialized patch should have 4 dimension.'
+        def valid_upatch_mode():
+            if (patch.shape[0] == 1) and self.cfg.patch.upatch:
+                self.upatch_flag = True
+                self.patches_flag = False
+                return True
+            return False
+
+        def valid_patches_mode():
+            if (patch.shape[0] > 1) and not self.cfg.patch.upatch:
+                self.upatch_flag = False
+                self.patches_flag = True
+                return True
+            return False
+
+        if valid_upatch_mode() or valid_patches_mode():
+            patch_type = 'upatch' if self.upatch_flag else 'patches'
+            self.logger.info(f'Load adversarial {patch_type} from path: {patch_path}')
+            self.patch = torch.nn.Parameter(patch)
+        else:
+            raise Exception("Please modify the patch config, and align the checkpoint with the upatch attribute.")
 
     @main_only
-    def save_patch(self, epoch=None, is_best=False):
+    def save_patch(self, convert2rgb, epoch=None, is_best=False):
         '''Save adversarial patch to file.'''
         patch_save_dir = os.path.join(self.cfg.log_dir, self.cfg.patch.save_folder)
         mkdirs_if_not_exists(patch_save_dir)
 
-        patches = self.patch.detach()
-        # print(patches)
-        patch_file_path = os.path.join(patch_save_dir, 'patches@epoch-' + str(epoch) + '.pth')
-        patch_images_path = os.path.join(patch_save_dir, 'patch-images@epoch-' + str(epoch))
-
-        if self.cfg.get('attacked_classes'):
-            patch_classes = self.cfg.attacked_classes
-            patch_labels = self.cfg.attacked_labels
+        patch = self.patch.detach()
+        if convert2rgb:
+            patch = patch.flip(1)
+        if not self.cfg.patch.upatch:
+            if self.cfg.get('attacked_classes'):
+                patch_classes = self.cfg.attacked_classes
+                patch_labels = self.cfg.attacked_labels
+            else:
+                patch_classes = self.cfg.all_classes
+                patch_labels = None
+            patch_file_path = os.path.join(patch_save_dir, 'patch-images@epoch-' + str(epoch), 'patches@epoch-' + str(epoch) + '.pth')
+            patch_images_path = os.path.join(patch_save_dir, 'patch-images@epoch-' + str(epoch))
+            torch.save(patch.cpu(), patch_file_path)
+            save_patches_to_images(patch, patch_images_path, patch_classes, patch_labels)
+            if is_best:
+                self.logger.info('save best patches in epoch %d' % epoch)
+                patch_file_path = os.path.join(patch_save_dir, 'best-patches.pth')
+                # patch_images_path = os.path.join(patch_save_dir, 'best-patch-images')
+                torch.save(patch.cpu(), patch_file_path)
+                save_patches_to_images(patch, patch_save_dir, patch_classes, patch_labels)
         else:
-            patch_classes = self.cfg.all_classes
-            patch_labels = None
-        torch.save(patches.cpu(), patch_file_path)
-        save_patches_to_images(patches, patch_images_path, patch_classes, patch_labels)
-        if is_best:
-            self.logger.info('save best patches in epoch %d' % epoch)
-            patch_file_path = os.path.join(patch_save_dir, 'best-patches.pth')
-            patch_images_path = os.path.join(patch_save_dir, 'best-patch-images')
-            torch.save(patches.cpu(), patch_file_path)
-            save_patches_to_images(patches, patch_images_path, patch_classes, patch_labels)
+            patch_file_path = os.path.join(patch_save_dir, 'upatch-image@epoch-' + str(epoch), 'upatch@epoch-' + str(epoch) + '.pth')
+            patch_images_path = os.path.join(patch_save_dir, 'upatch-image@epoch-' + str(epoch))
+            torch.save(patch.cpu(), patch_file_path)
+            save_upatch_to_image(patch, patch_images_path)
+            if is_best:
+                self.logger.info('save best patches in epoch %d' % epoch)
+                patch_file_path = os.path.join(patch_save_dir, 'best-upatch.pth')
+                torch.save(patch.cpu(), patch_file_path)
+                save_upatch_to_image(patch, patch_save_dir)
 
     def bbox_predict(self, batch_data, need_preprocess=True, return_images=False):
         """

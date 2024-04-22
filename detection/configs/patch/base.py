@@ -40,6 +40,7 @@ detector = dict(cfg_file='path_to_your_detector_config_file',
 # save_folder: str. Folder to save adversarial patches.
 # resume_path: str. Path to resumed patches.
 patch = dict(size=200, scale=0.2,
+             upatch=False,
              init_mode='gray',
              train_transforms=[dict(type='RandomHorizontalFlip', kwargs=dict(p=0.5)),
                                dict(type='MedianPool2d', kwargs=dict(kernel_size=7, same=True)),
@@ -50,7 +51,7 @@ patch = dict(size=200, scale=0.2,
                               dict(type='ScalePatchesToBoxes', kwargs=dict(scale_rate=0.2, rand_rotate=False))
                               ],
              save_period=30,
-             save_folder='saved_patches',
+             save_folder='saved_patch',
              resume_path=''
              )
 # loss_fn: a dict with following attributes:

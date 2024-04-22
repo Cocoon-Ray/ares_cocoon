@@ -58,8 +58,13 @@ class PatchApplier(nn.Module):
     def pad_patches_boxes(self, adv_patch, bboxes_list, labels_list, max_num_bboxes_per_image):
         selected_adv_patches = []
         padded_bboxes = []
+        upatch = (len(adv_patch) == 1)
+        assert adv_patch.ndim == 4
         for i in range(len(bboxes_list)):
-            patches = adv_patch[labels_list[i]]
+            if upatch:
+                patches = adv_patch.repeat(len(labels_list[i]), *[1] * (len(adv_patch.shape) - 1))
+            else:
+                patches = adv_patch[labels_list[i]]
             patches = torch.cat((patches, torch.zeros((max_num_bboxes_per_image - patches.shape[0], *patches.shape[1:]),
                                                       device=patches.device)), dim=0)
             bboxes = bboxes_list[i]

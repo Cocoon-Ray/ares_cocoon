@@ -115,8 +115,19 @@ def save_patches_to_images(patches, save_dir, class_names, labels=None):
         file_name = cls_name + '.png'
         save_image(patch, os.path.join(save_dir, file_name))
 
+def save_upatch_to_image(upatch, save_dir):
+    """Save adversarial patch to an image.
+    Args:
+        upatch (torch.Tensor): Aderversarial patches with Shape [1,C=3,H,W].
+        save_dir (str): Path to save adversarial patch.
+    """
+    mkdirs_if_not_exists(save_dir)
+    file_name = 'upatch' + '.png'
+    upatch = upatch[0]
+    save_image(upatch, os.path.join(save_dir, file_name))
 
-def save_images(img_tensors, data_samples, save_dir, with_bboxes=True, width=5, scale=True):
+
+def save_images(img_tensors, data_samples, save_dir, with_bboxes=True, is_rgb=False, width=5, scale=True):
     """Save images.
 
     Args:
@@ -130,6 +141,8 @@ def save_images(img_tensors, data_samples, save_dir, with_bboxes=True, width=5, 
     mkdirs_if_not_exists(save_dir)
     for img, data_sample in zip(img_tensors, data_samples):
         img_shape = data_sample.img_shape  # (H, W)
+        if not is_rgb:
+            img = img.flip(0)
         img = img[:, :img_shape[0], :img_shape[1]] * 255
         img = img.int().to(torch.uint8)
         img_name = os.path.basename(data_sample.img_path)

@@ -10,3 +10,4 @@ detection/src/
 cache/
 **/.uuid
 cifar10/
+detection/.dist_test/
