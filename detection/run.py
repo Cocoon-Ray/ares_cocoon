@@ -19,7 +19,7 @@ from ares.attack.detection.utils import HiddenPrints
 from ares.attack.detection.utils import modify_test_pipeline
 from ares.attack.detection.utils import modify_train_pipeline
 # The below imports are necessary to overwrite classes in mmdet package.
-from ares.attack.detection.custom import CocoDataset, CocoMetric
+# from ares.attack.detection.custom import CocoDataset, CocoMetric
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         detector.eval()
         test_dataloader = Runner.build_dataloader(detector_cfg.test_dataloader, seed=0, diff_rank_seed=False)
         if attack_cfg.get('use_detector_train_pipeline'):
-            train_dataloader = Runner.build_dataloader(detector_cfg.test_dataloader, seed=0, diff_rank_seed=False)#runner.train_dataloader
+            train_dataloader = Runner.build_dataloader(detector_cfg.test_dataloader, seed=0, diff_rank_seed=False)
         else:
             train_dataloader = test_dataloader
         evaluator = Evaluator(detector_cfg.test_evaluator)
@@ -103,7 +103,6 @@ if __name__ == "__main__":
     logger.info('Relative results will be saved in %s'%log_dir)
     attacker = UniversalAttacker(attack_cfg, detector, logger, device)
     trainer = Trainer(attack_cfg, attacker, train_dataloader, test_dataloader, evaluator, logger)
-
     if attack_cfg.attack_mode == 'global':
         trainer.eval(eval_on_clean=True)
     elif attack_cfg.attack_mode == 'patch':
