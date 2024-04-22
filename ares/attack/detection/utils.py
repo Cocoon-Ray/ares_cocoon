@@ -61,7 +61,7 @@ def is_main_process(group=None) -> int:
         return True
 
 
-def get_word_size(group=None):
+def get_world_size(group=None):
     """Return the number of used GPUs."""
     if is_distributed():
         # handle low versions of torch like 1.5.0 which does not support
@@ -125,7 +125,7 @@ def save_images(img_tensors, data_samples, save_dir, with_bboxes=True, width=5, 
         save_dir (str): Path to save images.
         with_bboxes (bool): Whether to save images with bbox rectangles on images.
         width (int): Line width to draw rectangles.
-        scale (bool): Whethe to scale images to original size.
+        scale (bool): Whether to scale images to original size.
     """
     mkdirs_if_not_exists(save_dir)
     for img, data_sample in zip(img_tensors, data_samples):

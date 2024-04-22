@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from .custom.lr_scheduler import build_lr_scheduler
 from .utils import build_optimizer
-from .utils import get_word_size
+from .utils import get_world_size
 from .utils import is_distributed
 from .utils import mkdirs_if_not_exists
 from .utils import save_images
@@ -51,7 +51,7 @@ class Trainer():
         '''Evaluate detection performance.'''
         self.before_eval()
         if eval_on_clean:
-            self.eval_clean()
+            self._eval_clean()
 
         save_adv_images = self.cfg.adv_image.save
 
@@ -117,7 +117,7 @@ class Trainer():
 
         self.runtime['epoch_loss'] = epoch_loss
     @torch.no_grad()
-    def eval_clean(self):
+    def _eval_clean(self):
         """Evaluate detection performance on clean data."""
         if self.cfg.clean_image.save:
             clean_image_save_dir = os.path.join(self.cfg.log_dir, self.cfg.clean_image.save_folder)
@@ -202,7 +202,7 @@ class Trainer():
         self.is_distributed = is_distributed()
         self.rank = 0 if not self.is_distributed else dist.get_rank()
         self.device = torch.device(self.rank)
-        self.world_size = get_word_size() if self.is_distributed else 1
+        self.world_size = get_world_size() if self.is_distributed else 1
         self.model = self.model.to(self.device)
         self.model.detector.to(self.device)
         if self.is_distributed:

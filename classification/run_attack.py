@@ -1,7 +1,10 @@
-import torch
-from torchvision import transforms
 import math
 import argparse
+
+import torch
+from torchvision import transforms
+from tqdm import tqdm
+
 from ares.utils.registry import registry
 from ares.utils.metrics import AverageMeter, accuracy
 from ares.utils.logger import setup_logger
@@ -78,7 +81,7 @@ def main(args):
     # attack process
     top1_m = AverageMeter()
     adv_top1_m = AverageMeter()
-    for i, (images, labels) in enumerate(test_loader):
+    for i, (images, labels) in enumerate(tqdm(test_loader)):
         # load data
         batchsize = images.shape[0]
         images, labels = images.to(device), labels.to(device)

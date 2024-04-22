@@ -1,5 +1,4 @@
 import torch.nn as nn
-from ares.utils.registry import Registry
 from .patch_transform import *
 
 class PatchApplier(nn.Module):

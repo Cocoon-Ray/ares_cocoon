@@ -171,20 +171,42 @@ class UniversalAttacker(nn.Module):
         empty_gt = InstanceData(bboxes=bboxes, labels=labels, metainfo={})
         for data_sample in data_samples:
             data_sample.gt_instances = empty_gt
+    #
+    # def filter_loss(self, losses):
+    #     '''Collect losses not in self.cfg.loss_fn.excluded_losses.'''
+    #     loss_list = []
+    #     for key in losses.keys():
+    #         if isinstance(losses[key], list):
+    #             losses[key] = torch.stack(losses[key]).mean()
+    #         kept = True
+    #         for excluded_loss in self.cfg.loss_fn.excluded_losses:
+    #             if excluded_loss in key:
+    #                 kept = False
+    #                 continue
+    #         if kept and 'loss' in key:
+    #             loss_list.append(losses[key].mean().unsqueeze(0))
+    #     if self.cfg.object_vanish_only:
+    #         loss = torch.stack(loss_list).mean()
+    #     else:
+    #         loss = -torch.stack(loss_list).mean()
+    #     return loss
+
 
     def filter_loss(self, losses):
         '''Collect losses not in self.cfg.loss_fn.excluded_losses.'''
         loss_list = []
         for key in losses.keys():
-            if isinstance(losses[key], list):
-                losses[key] = torch.stack(losses[key]).mean()
-            kept = True
-            for excluded_loss in self.cfg.loss_fn.excluded_losses:
-                if excluded_loss in key:
-                    kept = False
-                    continue
-            if kept and 'loss' in key:
-                loss_list.append(losses[key].mean().unsqueeze(0))
+            if 'loss' in key:
+                # ignore other typo items
+                if isinstance(losses[key], list):
+                    losses[key] = torch.stack(losses[key])
+                kept = True
+                for excluded_loss in self.cfg.loss_fn.excluded_losses:
+                    if excluded_loss in key:
+                        kept = False
+                        break
+                if kept:
+                    loss_list.append(losses[key].mean().unsqueeze(0))
         if self.cfg.object_vanish_only:
             loss = torch.stack(loss_list).mean()
         else:
@@ -253,8 +275,9 @@ class UniversalAttacker(nn.Module):
         '''Save adversarial patch to file.'''
         patch_save_dir = os.path.join(self.cfg.log_dir, self.cfg.patch.save_folder)
         mkdirs_if_not_exists(patch_save_dir)
-        patches = self.patch.detach()
 
+        patches = self.patch.detach()
+        # print(patches)
         patch_file_path = os.path.join(patch_save_dir, 'patches@epoch-' + str(epoch) + '.pth')
         patch_images_path = os.path.join(patch_save_dir, 'patch-images@epoch-' + str(epoch))
 
@@ -301,6 +324,7 @@ class UniversalAttacker(nn.Module):
                 else:
                     raise ValueError(
                         f"Expected image pixel value range before normalization is [0, 1] or [0, 255], but got min value {min_val}, max value {max_val}!")
+
             images = images / self.detector_image_max_val
             return preds, images
         return preds
