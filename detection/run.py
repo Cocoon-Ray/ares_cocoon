@@ -111,6 +111,6 @@ if __name__ == "__main__":
         if args.eval_only:
             assert attack_cfg.patch.resume_path, 'Adversarial patches path should not be none for eval only mode!'
             trainer.eval(eval_on_clean=True)
-            # trainer.eval(eval_on_clean=True) # for debug
+            # trainer.eval(eval_on_clean=False) # for debug
         else:
             trainer.train()

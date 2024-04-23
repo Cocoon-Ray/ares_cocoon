@@ -74,6 +74,6 @@ adv_image = dict(save=False, save_folder='adv_images', with_bboxes=True)
 # with_bboxes: bool. Whether to save adversarial images with bboxes drawn.
 clean_image = dict(save=False, save_folder='clean_images', with_bboxes=True)
 # eval_period: int. Period to evaluate detection performance on attacked images.
-eval_period = 30
+eval_period = 30 # 30
 # log_period: int. Period to log information.
-log_period = 20
+log_period = 20 # 20

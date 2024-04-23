@@ -311,21 +311,22 @@ class UniversalAttacker(nn.Module):
             else:
                 patch_classes = self.cfg.all_classes
                 patch_labels = None
-            patch_file_path = os.path.join(patch_save_dir, 'patch-images@epoch-' + str(epoch), 'patches@epoch-' + str(epoch) + '.pth')
             patch_images_path = os.path.join(patch_save_dir, 'patch-images@epoch-' + str(epoch))
-            torch.save(patch.cpu(), patch_file_path)
+            mkdirs_if_not_exists(patch_images_path)
             save_patches_to_images(patch, patch_images_path, patch_classes, patch_labels)
+            patch_file_path = os.path.join(patch_images_path, 'patches@epoch-' + str(epoch) + '.pth')
+            torch.save(patch.cpu(), patch_file_path)
             if is_best:
                 self.logger.info('save best patches in epoch %d' % epoch)
                 patch_file_path = os.path.join(patch_save_dir, 'best-patches.pth')
-                # patch_images_path = os.path.join(patch_save_dir, 'best-patch-images')
                 torch.save(patch.cpu(), patch_file_path)
                 save_patches_to_images(patch, patch_save_dir, patch_classes, patch_labels)
         else:
-            patch_file_path = os.path.join(patch_save_dir, 'upatch-image@epoch-' + str(epoch), 'upatch@epoch-' + str(epoch) + '.pth')
             patch_images_path = os.path.join(patch_save_dir, 'upatch-image@epoch-' + str(epoch))
-            torch.save(patch.cpu(), patch_file_path)
+            mkdirs_if_not_exists(patch_images_path)
             save_upatch_to_image(patch, patch_images_path)
+            patch_file_path = os.path.join(patch_save_dir, 'upatch-image@epoch-' + str(epoch), 'upatch@epoch-' + str(epoch) + '.pth')
+            torch.save(patch.cpu(), patch_file_path)
             if is_best:
                 self.logger.info('save best patches in epoch %d' % epoch)
                 patch_file_path = os.path.join(patch_save_dir, 'best-upatch.pth')

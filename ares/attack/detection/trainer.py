@@ -76,6 +76,7 @@ class Trainer():
         """Train for one epoch."""
         epoch_loss = torch.tensor(0.0, device=self.rank, requires_grad=False)
         t1 = time.time()
+        time_delta_list = []
         for i, batch_data in enumerate(self.train_dataloader):
             with torch.cuda.amp.autocast(enabled=self.cfg.amp):
                 losses = self.model(batch_data)
@@ -103,7 +104,7 @@ class Trainer():
                 pass
             t2 = time.time()
             batch_time = t2 - t1
-            t1 = t2
+            time_delta_list.append(batch_time)
             if i % self.cfg.log_period == 0:
                 epoch = self.runtime['epoch']
                 length = len(self.train_dataloader)
@@ -112,8 +113,11 @@ class Trainer():
                 info = f'Epoch:{epoch:3d}/{self.epochs}  Iter:{i:4d}/{length}  loss:{batch_loss:.2f} ({avg_loss:.2f})  '
                 if self.cfg.loss_fn.tv_loss.enable:
                     info += f'loss tv:{loss_tv.item():.2f}  '
-                info += f'time:{batch_time:.1f}s'
+                mean_batch_time = sum(time_delta_list) / len(time_delta_list)
+                info += f'time:{mean_batch_time:.1f}s'
+                time_delta_list = []
                 self.logger.info(info)
+            t1 = time.time()
         self.runtime['epoch_loss'] = epoch_loss
 
     @torch.no_grad()
@@ -180,9 +184,9 @@ class Trainer():
     def after_train(self):
         """Do something after finishing training."""
         metrics = self.eval(eval_on_clean=False)
-        if self.rank == 0:
-            patch_save_dir = os.path.join(self.cfg.log_dir, self.cfg.patch.save_folder)
-            mkdirs_if_not_exists(patch_save_dir)
+        # if self.rank == 0:
+        #     patch_save_dir = os.path.join(self.cfg.log_dir, self.cfg.patch.save_folder)
+        #     mkdirs_if_not_exists(patch_save_dir)
         is_best = metrics['coco/bbox_mAP'] < self.runtime['lowest_bbox_mAP']
         if is_best:
             self.runtime['lowest_bbox_mAP'] = metrics['coco/bbox_mAP']
