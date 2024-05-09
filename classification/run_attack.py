@@ -1,9 +1,10 @@
 import math
 import argparse
+from tqdm import tqdm
 
 import torch
 from torchvision import transforms
-from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 
 from ares.utils.registry import registry
 from ares.utils.metrics import AverageMeter, accuracy
@@ -31,7 +32,7 @@ def get_args_parser():
     parser.add_argument('--attack_name', type=str, default='tim', help= 'Dataset for this model')
     parser.add_argument('--model_name', type=str, default='resnet50_at', help= 'Model name')
     parser.add_argument('--dataset', type=str, default='imagenet', choices=['imagenet', 'cifar10'], help= 'ImageNet and cifar10 supported, you need to define custom dataset class if other dataset being used.')
-    
+
     args = parser.parse_args()
     
     return args

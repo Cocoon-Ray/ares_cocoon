@@ -197,8 +197,6 @@ class Trainer():
     def before_start(self):
         """Initialization before starting training or evaluating."""
         if self.cfg.attack_mode == 'patch':
-            if self.cfg.patch.get('resume_path'):
-                self.model.load_patch(self.cfg.patch.resume_path)
             self.runtime = {}  # to store some variables during the training period
             self.runtime['total_loss'] = {'value': 0, 'length': 0}
             self.runtime['epoch'] = 1

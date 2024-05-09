@@ -176,22 +176,29 @@ class CocoDataset(BaseDetDataset):
             List[dict]: Filtered results.
         """
         if self.kept_classes:
+            # print(self.data_list[0])
             ids_in_cat = set()
             for i, class_id in enumerate(self.kept_cats):
                 ids_in_cat |= set(self.cat_img_map[class_id])
             valid_data_infos = []
+
+            # only keep the gt box of the attacked classes
+            # for i, data_info in enumerate(self.data_list):
+            #     data_instances_before_filter = data_info['instances']
+            #     data_instances_after_filter = []
+            #     for each_instance in data_instances_before_filter:
+            #         if each_instance['bbox_label'] in self.kept_labels:
+            #             data_instances_after_filter.append(each_instance)
+            #     data_info['instances'] = data_instances_after_filter
+
             for i, data_info in enumerate(self.data_list):
                 img_id = data_info['img_id']
                 if img_id in ids_in_cat:
                     valid_data_infos.append(data_info)
             return valid_data_infos
 
-        # if self.test_mode:
-        #     return self.data_list
-
         if self.filter_cfg is None:
             return self.data_list
-
         filter_empty_gt = self.filter_cfg.get('filter_empty_gt', False)
         min_size = self.filter_cfg.get('min_size', 0)
 
@@ -216,15 +223,3 @@ class CocoDataset(BaseDetDataset):
                 valid_data_infos.append(data_info)
 
         return valid_data_infos
-
-    # def generate_kept_indices(self):
-    #
-    #     kept_indices = []
-    #     for i in range(len(self.data_list)):
-    #         data = self.data_list[i]
-    #         instances = data['instances']
-    #         for instance in instances:
-    #             if instance['bbox_label'] in self.kept_labels:
-    #                 kept_indices.append(i)
-    #                 break
-    #     return kept_indices

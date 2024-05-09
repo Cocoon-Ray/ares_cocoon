@@ -8,18 +8,13 @@ import torch
 import torch.distributed as dist
 from mmengine.config import Config, DictAction
 from mmengine.runner import Runner
-from mmengine.registry import MODELS
-from mmengine.registry import DefaultScope
+from mmengine.registry import MODELS, DefaultScope
 from mmengine.evaluator.evaluator import Evaluator
 from ares.utils.logger import setup_logger
 from ares.attack.detection.trainer import Trainer
 from ares.attack.detection.attacker import UniversalAttacker
-from ares.attack.detection.utils import all_reduce, mkdirs_if_not_exists
-from ares.attack.detection.utils import HiddenPrints
-from ares.attack.detection.utils import modify_test_pipeline
-from ares.attack.detection.utils import modify_train_pipeline
-# The below imports are necessary to overwrite classes in mmdet package.
-# from ares.attack.detection.custom import CocoDataset, CocoMetric
+from ares.attack.detection.utils import all_reduce, mkdirs_if_not_exists, HiddenPrints
+from ares.attack.detection.utils import modify_test_pipeline, modify_train_pipeline
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -51,6 +46,7 @@ if __name__ == "__main__":
         detector_cfg.model.data_preprocessor.mean = [0.0] * 3
     if not detector_cfg.model.data_preprocessor.get('std', False):
         detector_cfg.model.data_preprocessor.std = [1.0] * 3
+
     if attack_cfg.get('attacked_classes', False):
         detector_cfg.test_dataloader.dataset.kept_classes = attack_cfg.attacked_classes
         detector_cfg.train_dataloader.dataset.kept_classes = attack_cfg.attacked_classes
@@ -95,21 +91,23 @@ if __name__ == "__main__":
     if attack_cfg.get('attacked_classes', False):
         attack_cfg.attacked_labels = test_dataloader.dataset.kept_labels
 
-    attack_cfg.all_classes = test_dataloader.dataset.metainfo['classes']
+    attack_cfg.all_classes = test_dataloader.dataset.metainfo['classes'] # verify whether this line is helpful
     attack_cfg.final_rgb_mode = detector_cfg.model.data_preprocessor.get('bgr_to_rgb', False)
+    logger = setup_logger(save_dir=log_dir, distributed_rank=local_rank)
+    logger.info('Relative results will be saved in %s' % log_dir)
+    resume_path = attack_cfg.patch.get('resume_path', None)
+    attacker = UniversalAttacker(attack_cfg, detector, logger, device)
+    trainer = Trainer(attack_cfg, attacker, train_dataloader, test_dataloader, evaluator, logger)
     if local_rank == 0:
         attack_cfg.dump(os.path.join(log_dir, os.path.basename(args.cfg)))
         detector_cfg.dump(os.path.join(log_dir, 'detector_cfg.py'))
-    logger = setup_logger(save_dir=log_dir, distributed_rank=local_rank)
-    logger.info('Relative results will be saved in %s'%log_dir)
-    attacker = UniversalAttacker(attack_cfg, detector, logger, device)
-    trainer = Trainer(attack_cfg, attacker, train_dataloader, test_dataloader, evaluator, logger)
+
     if attack_cfg.attack_mode == 'global':
         trainer.eval(eval_on_clean=True)
         # trainer.eval(eval_on_clean=False) # for debug
     elif attack_cfg.attack_mode == 'patch':
         if args.eval_only:
-            assert attack_cfg.patch.resume_path, 'Adversarial patches path should not be none for eval only mode!'
+            assert resume_path, 'Adversarial patches path should not be none for eval only mode!'
             trainer.eval(eval_on_clean=True)
             # trainer.eval(eval_on_clean=False) # for debug
         else:

@@ -2,7 +2,8 @@ from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, IMA
 
 MEAN_ZERO = (0.0, 0.0, 0.0)
 STA_ONE = (1.0, 1.0, 1.0)
-
+MEAN_MID = (0.5, 0.5, 0.5)
+STD_MID = (0.5, 0.5, 0.5)
 
 def get_url(ckpt_name):
     url = "https://ml.cs.tsinghua.edu.cn/~xiaoyang/aresbench/ckpt-imagenet/" + ckpt_name
@@ -100,8 +101,8 @@ imagenet_model_zoo = {
     },
     "resnet152_fd": {
         "model": "resnet152_fd",
-        "mean": MEAN_ZERO,
-        "std": STA_ONE,
+        "mean": MEAN_MID,
+        "std": STD_MID,
         "pretrained": False,
         "act_gelu": False,
         "batch_size": 5,

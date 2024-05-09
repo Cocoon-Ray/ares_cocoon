@@ -5,6 +5,7 @@ class Registry:
     '''The class for registry of modules.'''
     mapping = {
         "attacks": {},
+        "patch_appliers": {},
         "models": {},
         "lr_schedulers": {},
         "transforms": {},
@@ -31,6 +32,29 @@ class Registry:
 
             cls.mapping["attacks"][registerd_name] = attack
             return attack
+
+        return wrap
+
+    @classmethod
+    def register_patch_applier(cls, name=None, force=False):
+        r"""Register an patch apply method to registry with key 'name'
+
+        Args:
+            name (str): Key with which the patch applier will be registered.
+            force (bool): Whether to register when the name has already existed in registry.
+        """
+
+        def wrap(patch_applier):
+            registerd_name = patch_applier.__name__ if name is None else name
+            if registerd_name in cls.mapping["patch_appliers"] and not force:
+                raise KeyError(
+                    "Name '{}' already registered for {}.".format(
+                        registerd_name, cls.mapping["patch_appliers"][registerd_name]
+                    )
+                )
+
+            cls.mapping["patch_appliers"][registerd_name] = patch_applier
+            return patch_applier
 
         return wrap
 
@@ -124,6 +148,13 @@ class Registry:
         raise KeyError(f'{name} is not registered!')
 
     @classmethod
+    def get_patch_applier(cls, name):
+        '''Get a patch apply method by given name.'''
+        if cls.mapping["patch_appliers"].get(name, None):
+            return cls.mapping["patch_appliers"].get(name)
+        raise KeyError(f'{name} is not registered!')
+
+    @classmethod
     def get_model(cls, name):
         '''Get a model object by given name.'''
         if cls.mapping["models"].get(name, None):
@@ -155,6 +186,11 @@ class Registry:
     def list_attacks(cls):
         '''List all attack methods registered.'''
         return sorted(cls.mapping["attacks"].keys())
+
+    @classmethod
+    def list_patch_appliers(cls):
+        '''List all attack methods registered.'''
+        return sorted(cls.mapping["patch_appliers"].keys())
 
     @classmethod
     def list_models(cls):

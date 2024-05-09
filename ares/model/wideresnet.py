@@ -97,6 +97,28 @@ class WideResNet(nn.Module):
 
         return self.fc(out)
 
+    def vis_compute_flow(self, input_tensor):
+        """
+        a static analytic tool, which should be run after initialization in a seperate script
+
+        Args:
+            input_tensor: (bs, ch, h, w)
+        """
+
+        import subprocess
+        import tempfile
+        from torch.utils.tensorboard import SummaryWriter
+
+        temp_dir = tempfile.mkdtemp()
+        with SummaryWriter(log_dir=temp_dir, comment='dae') as writer:
+            subprocess.Popen(['tensorboard', f'--logdir={temp_dir}', '--port=6006'])
+            writer.add_graph(self, input_tensor)
+        try:
+            while True:
+                pass
+        except:
+            import shutil
+            shutil.rmtree(temp_dir)
 
 def create_wres34_10_fn():
     '''The function to create wide-resnet34-10 with FN and WN for cifar10 models.'''
