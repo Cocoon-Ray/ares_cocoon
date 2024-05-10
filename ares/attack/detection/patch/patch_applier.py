@@ -69,7 +69,7 @@ class LabelBasedPatchApplier(nn.Module):
             if self.per_label_per_patch:
                 patches = adv_patch[labels_list[i]]
             else:
-                adv_patch = adv_patch[0].unsqueeze(0)
+                adv_patch = adv_patch[-1].unsqueeze(0)
                 patches = adv_patch.repeat(len(labels_list[i]), *[1] * (len(adv_patch.shape) - 1))
             patches = torch.cat((patches, torch.zeros((max_num_bboxes_per_image - patches.shape[0], *patches.shape[1:]),
                                                       device=patches.device)), dim=0)
@@ -117,6 +117,6 @@ class LabelBasedPatchApplier(nn.Module):
 
     def get_applied_patch_for_tvloss(self, adv_patch):
         if not self.per_label_per_patch:
-            return adv_patch[0]
+            return adv_patch[-1]
         else:
             return adv_patch[self.unique_labels_related]

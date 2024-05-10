@@ -41,21 +41,23 @@ auto_lr_scaler = dict(base_batch_size=8)
 detector = dict(cfg_file='path_to_your_detector_config_file',
                 weight_file='path_to_your_detector_weight_file')
 
+# resume_path: str. Path to resumed patches, will ignore the new setting of the patch, attacked_class, and patch_applier, use
+# the corresponding setting of the resumed patch. the patch config in result dir would reserve the resumed version.
+resume_path = ''
+
 # patch:  a dict with following attributes:
 # size: int. Size of the square adversarial patches.
 # init_mode: str. Supported values: 'gray', 'white', 'black' and 'random'.
 # save_period: int. Period for saving adversarial patches.
 # save_folder: str. Folder to save adversarial patches.
-# resume_path: str. Path to resumed patches.
-# resume_all: bool. Ignore patch and applier setting and inherit them from checkpoint by force,
-# only work when resume_path is not empty
 patch = dict(size=200,
              init_mode='gray',
              save_period=1, # 30
-             save_folder='saved_patch',
-             resume_path='',
-             resume_all=True
+             save_folder='saved_patch'
              )
+
+# patch_applier: config the dict in children config file
+patch_applier = dict()
 
 # loss_fn: a dict with following attributes:
 # tv_loss: dict. Whether to enable and its parameters.
@@ -64,8 +66,9 @@ loss_fn = dict(tv_loss=dict(enable=True, tv_scale=2.5, tv_thresh=0.1),
                excluded_losses=['loss_bbox', 'loss_iou', 'loss_xy', 'loss_wh']
                )
 
-# attacked_classes: list or None. If None, all classes will be attacked.
-# if list, only classes in it will be attacked.
+# attacked_classes: list or None. If None, all classes will be attacked. if list, only classes in it will be attacked.
+# This attribute works in different way while using different patch applier. While using LabelBasedPatchApplier, setting
+# attacked_classes means switching on per_label_per_patch and ignoring its previous setting.
 attacked_classes = None
 
 # adv_image: a dict with following attributes:

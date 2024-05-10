@@ -12,7 +12,7 @@ from ares.utils.logger import setup_logger
 from ares.dataset.imagenet_dataset import ImageNetDataset
 from ares.model import cifar_model_zoo, imagenet_model_zoo
 from torchvision.datasets import CIFAR10
-from classification.attack_configs import attack_configs
+from ares.benchmark import attack_configs
 
 def get_args_parser():
     parser = argparse.ArgumentParser()
@@ -110,8 +110,6 @@ def main(args):
     logger.info("Clean accuracy of {0} is {1}%".format(args.model_name, round(top1_m.avg, 2)))
     logger.info("Robust accuracy of {0} is {1}%".format(args.model_name, round(adv_top1_m.avg, 2)))
 
-
 if __name__ == "__main__":
     args = get_args_parser()
     main(args)
-

@@ -9,7 +9,7 @@ from mmengine.structures import InstanceData
 # from .patch.patch_applier import PatchApplier
 from .utils import EnableLossCal
 from .utils import normalize, denormalize, main_only
-from .utils import tv_loss, mkdirs_if_not_exists, save_patches_to_images, save_upatch_to_image
+from .utils import tv_loss, mkdirs_if_not_exists
 
 
 class UniversalAttacker(nn.Module):
@@ -135,15 +135,17 @@ class UniversalAttacker(nn.Module):
     def init_for_patch_attack(self):
         '''Initialize adversarial patch, patch applier and attacked labels for patch attack.'''
         self.patch = self.init_patch(init_mode=self.cfg.patch.init_mode)
-        if self.cfg.patch.get('resume_path'):
-            self.load_patch(self.cfg.patch.resume_path, self.cfg.patch.resume_all)
-        kwargs = {'size': self.cfg.patch.size,
-                  'train_transforms': self.cfg.patch_applier.train_transforms,
-                  'test_transforms': self.cfg.patch_applier.test_transforms}
+        if self.cfg.get('resume_path'):
+            # load patch and modify relevent setting in the config
+            self.load_patch(self.cfg.resume_path)
         if self.cfg.patch_applier.type == 'LabelBasedPatchApplier':
+            kwargs = {'size': self.cfg.patch.size,
+                      'train_transforms': self.cfg.patch_applier.train_transforms,
+                      'test_transforms': self.cfg.patch_applier.test_transforms}
             if self.cfg.get('attacked_labels', False):
                 self.attacked_labels = torch.Tensor(self.cfg.attacked_labels).to(self.device)
                 kwargs.update({'attacked_labels': self.attacked_labels})
+                self.cfg.patch_applier.per_label_per_patch = True
             kwargs.update({'per_label_per_patch': self.cfg.patch_applier.per_label_per_patch})
         self.patch_applier = Registry.get_patch_applier(self.cfg.patch_applier.type)(**kwargs)
 
@@ -204,13 +206,13 @@ class UniversalAttacker(nn.Module):
         except:
             num_classes = self.detector.roi_head.bbox_head.num_classes
         self.logger.info('Adversarial patches initialzed by %s mode' % init_mode)
-        patch = torch.full((num_classes, 3, height, width), 0.5)
+        patch = torch.full((num_classes+1, 3, height, width), 0.5)
         if init_mode.lower() == 'random':
-            patch = torch.rand((num_classes, 3, height, width))
+            patch = torch.rand((num_classes+1, 3, height, width))
         elif init_mode.lower() == 'white':
-            patch = torch.full((num_classes, 3, height, width), 1.0)
+            patch = torch.full((num_classes+1, 3, height, width), 1.0)
         elif init_mode.lower() == 'black':
-            patch = torch.full((num_classes, 3, height, width), 0)
+            patch = torch.full((num_classes+1, 3, height, width), 0)
         else:
             pass
         patch = nn.Parameter(patch, requires_grad=True)
@@ -239,7 +241,7 @@ class UniversalAttacker(nn.Module):
         self.detector.training = False
         return self
 
-    def load_patch(self, patch_path, resume_all):
+    def load_patch(self, patch_path):
         '''Initialize patch with given patch_path'''
         load_dict = torch.load(patch_path, map_location=self.device)
         self.logger.info(f'Load adversarial patch from path: {patch_path}')
@@ -249,11 +251,10 @@ class UniversalAttacker(nn.Module):
         if not self.cfg.final_rgb_mode:
             patch = patch.flip(1)
 
-        if resume_all:
-            self.cfg.patch = load_dict['patch_cfg']
-            self.cfg.patch_applier = load_dict['patch_applier_cfg']
-            self.cfg.attacked_classes = self.cfg.patch_applier.attacked_classes
-            self.logger.info(f'Ignore the patch and applier setting in the config and use the settings of the patch checkpoint')
+        self.cfg.patch = load_dict['patch_cfg']
+        self.cfg.patch_applier = load_dict['patch_applier_cfg']
+        self.cfg.attacked_classes = load_dict['attacked_classes']
+        self.logger.info(f'Ignore the patch and applier setting in the config and use the settings of the patch checkpoint')
 
         self.patch = torch.nn.Parameter(patch)
 
@@ -269,7 +270,8 @@ class UniversalAttacker(nn.Module):
         patch_dir_path = os.path.join(patch_save_dir, 'patch@epoch-' + str(epoch))
         mkdirs_if_not_exists(patch_dir_path)
         patch_path = os.path.join(patch_dir_path, 'patch@epoch-' + str(epoch) + '.pth')
-        save_dict = {'patch': patch.cpu(), 'patch_cfg': self.cfg.patch, 'patch_applier_cfg': self.cfg.patch_applier}
+        save_dict = {'patch': patch.cpu(), 'patch_cfg': self.cfg.patch,
+                     'patch_applier_cfg': self.cfg.patch_applier, 'attacked_classes': self.cfg.attacked_classes}
         save_dict.update({'threat_detector_cfg': self.cfg.detector.cfg_file,
                           'threat_detector_weight': self.cfg.detector.weight_file})
         torch.save(save_dict, patch_path)

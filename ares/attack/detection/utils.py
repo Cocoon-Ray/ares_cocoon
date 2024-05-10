@@ -140,6 +140,7 @@ def save_images(img_tensors, data_samples, save_dir, with_bboxes=True, is_rgb=Fa
     """
     mkdirs_if_not_exists(save_dir)
     for img, data_sample in zip(img_tensors, data_samples):
+        img = img.cpu()
         img_shape = data_sample.img_shape  # (H, W)
         if not is_rgb:
             img = img.flip(0)

@@ -10,4 +10,5 @@ detection/src/
 cache/
 **/.uuid
 cifar10/
+imagenetv2/
 detection/.dist_test/

@@ -95,7 +95,7 @@ if __name__ == "__main__":
     attack_cfg.final_rgb_mode = detector_cfg.model.data_preprocessor.get('bgr_to_rgb', False)
     logger = setup_logger(save_dir=log_dir, distributed_rank=local_rank)
     logger.info('Relative results will be saved in %s' % log_dir)
-    resume_path = attack_cfg.patch.get('resume_path', None)
+    resume_path = attack_cfg.get('resume_path', None)
     attacker = UniversalAttacker(attack_cfg, detector, logger, device)
     trainer = Trainer(attack_cfg, attacker, train_dataloader, test_dataloader, evaluator, logger)
     if local_rank == 0:
@@ -108,6 +108,7 @@ if __name__ == "__main__":
     elif attack_cfg.attack_mode == 'patch':
         if args.eval_only:
             assert resume_path, 'Adversarial patches path should not be none for eval only mode!'
+            logger.info("Use patch applier and corresponding setting of the test patch and ignore the previous setting.")
             trainer.eval(eval_on_clean=True)
             # trainer.eval(eval_on_clean=False) # for debug
         else:

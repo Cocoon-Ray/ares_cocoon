@@ -8,6 +8,7 @@ from .defense import *
 from .model import *
 from .utils import *
 from .utils.registry import registry
+from .benchmark import *
 
 
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
