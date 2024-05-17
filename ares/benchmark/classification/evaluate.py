@@ -4,9 +4,11 @@ from torchvision import transforms, datasets
 from torch.utils.data import DataLoader
 from ...utils.registry import registry
 from ...utils.metrics import AverageMeter, accuracy
-from .attack_configs import attack_configs
+from ...attack import attack_configs
+from ...dataset import ImageFolder
 
 
+@torch.no_grad()
 def evaluate_cifar10(model, data_dir, gpu=0):
     test_transforms = transforms.Compose([transforms.ToTensor()])
     test_dataset = datasets.CIFAR10(data_dir, train=False, download=False, transform=test_transforms)
@@ -19,6 +21,7 @@ def evaluate_cifar10(model, data_dir, gpu=0):
     device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
 
     model = model.to(device)
+    model.eval()
 
     top1_m = AverageMeter()
     for i, (images, labels) in enumerate(tqdm(test_loader)):
@@ -33,7 +36,8 @@ def evaluate_cifar10(model, data_dir, gpu=0):
         clean_acc = accuracy(logits, labels)[0]
         top1_m.update(clean_acc.item(), batchsize)
 
-    print(f"Cifar10 Clean accuracy: {round(top1_m.avg, 2)}%")
+    print(f"Cifar10 Clean accuracy: {round(top1_m.avg, 2)}")
+
 
 def evaluate_cifar10_attack(model, data_dir, attack_name, gpu=0):
     test_transforms = transforms.Compose([transforms.ToTensor()])
@@ -47,6 +51,7 @@ def evaluate_cifar10_attack(model, data_dir, attack_name, gpu=0):
     device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
 
     model = model.to(device)
+    model.eval()
 
     # initialize attacker
     attacker_cls = registry.get_attack(attack_name)
@@ -74,7 +79,7 @@ def evaluate_cifar10_attack(model, data_dir, attack_name, gpu=0):
             adv_acc = adv_acc.item()
         adv_top1_m.update(adv_acc, batchsize)
 
-    print(f"Cifar10 Robust accuracy: {round(adv_top1_m.avg, 2)}%")
+    print(f"Cifar10 Robust accuracy: {round(adv_top1_m.avg, 2)}")
 
 imagenet_transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -83,15 +88,12 @@ imagenet_transform = transforms.Compose([
 ])
 
 
-def evaluate_dataset(model, data_dir, transform=imagenet_transform, gpu=0):
-
-    test_dataset = datasets.ImageFolder(root=data_dir, transform=transform)
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
-
+@torch.no_grad()
+def evaluate_with_loader(model, test_loader, gpu=0):
     device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
 
     model = model.to(device)
-
+    model.eval()
     top1_m = AverageMeter()
     for i, (images, labels) in enumerate(tqdm(test_loader)):
         # load data
@@ -105,14 +107,42 @@ def evaluate_dataset(model, data_dir, transform=imagenet_transform, gpu=0):
         clean_acc = accuracy(logits, labels)[0]
         top1_m.update(clean_acc.item(), batchsize)
 
-    print(f"Clean accuracy: {round(top1_m.avg, 2)}%")
+    acc = round(top1_m.avg, 2)
+    return acc
 
-def evaluate_dataset_attack(model, data_dir, attack_name, transform=imagenet_transform, gpu="0"):
-    test_dataset = datasets.ImageFolder(root=data_dir, transform=transform)
-    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=8, shuffle=False)
-    device = torch.device(f"cuda:{int(gpu)}" if torch.cuda.is_available() else "cpu")
+
+@torch.no_grad()
+def evaluate_dataset(model, data_dir, transform=imagenet_transform, gpu=0):
+    test_dataset = ImageFolder(root=data_dir, transform=transform)
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=8, shuffle=False, pin_memory=True, num_workers=8)
+    device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
 
     model = model.to(device)
+    model.eval()
+    top1_m = AverageMeter()
+    for i, (images, labels) in enumerate(tqdm(test_loader)):
+        # load data
+        batchsize = images.shape[0]
+        images, labels = images.to(device), labels.to(device)
+
+        # clean acc
+        with torch.no_grad():
+            logits = model(images)
+
+        clean_acc = accuracy(logits, labels)[0]
+        top1_m.update(clean_acc.item(), batchsize)
+
+    acc = round(top1_m.avg, 2)
+    print(f"Clean accuracy: {acc}")
+
+
+def evaluate_dataset_attack(model, data_dir, attack_name, transform=imagenet_transform, gpu=0):
+    test_dataset = ImageFolder(root=data_dir, transform=transform)
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=8, shuffle=False, pin_memory=True, num_workers=8)
+    device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
+
+    model = model.to(device)
+    model.eval()
 
     # initialize attacker
     attacker_cls = registry.get_attack(attack_name)
@@ -140,5 +170,4 @@ def evaluate_dataset_attack(model, data_dir, attack_name, transform=imagenet_tra
             adv_acc = adv_acc.item()
         adv_top1_m.update(adv_acc, batchsize)
 
-    print(f"Robust accuracy: {round(adv_top1_m.avg, 2)}%")
-
+    print(f"Robust accuracy: {round(adv_top1_m.avg, 2)}")

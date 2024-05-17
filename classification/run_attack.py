@@ -12,7 +12,7 @@ from ares.utils.logger import setup_logger
 from ares.dataset.imagenet_dataset import ImageNetDataset
 from ares.model import cifar_model_zoo, imagenet_model_zoo
 from torchvision.datasets import CIFAR10
-from ares.benchmark import attack_configs
+from ares.attack import attack_configs
 
 def get_args_parser():
     parser = argparse.ArgumentParser()

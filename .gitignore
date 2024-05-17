@@ -12,3 +12,5 @@ cache/
 cifar10/
 imagenetv2/
 detection/.dist_test/
+classification/ckpt/
+imagenet/

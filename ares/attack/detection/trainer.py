@@ -36,6 +36,65 @@ class Trainer():
 
         self.before_start()
 
+    @torch.no_grad()
+    def eval(self, eval_on_clean=False):
+        '''Evaluate detection performance.'''
+        if eval_on_clean:
+            self.eval_clean()
+        self.eval_adv()
+
+    def eval_adv(self):
+        self.before_eval(eval_on_clean=False)
+        self._eval_adv()
+
+    def eval_clean(self):
+        self.before_eval(eval_on_clean=True)
+        self._eval_clean()
+
+    @torch.no_grad()
+    def _eval_clean(self):
+        """Evaluate detection performance on clean data."""
+        if self.is_distributed:
+            dist.barrier()
+        self.logger.info('Evaluating detection performance on clean data...')
+        model = self.model.module if self.is_distributed else self.model
+        for i, batch_data in tqdm(enumerate(self.test_dataloader), total=len(self.test_dataloader)):
+            with torch.cuda.amp.autocast(enabled=self.cfg.amp):
+                preds, images = model.bbox_predict(batch_data, return_images=True)
+            self.evaluator.process(data_samples=preds)
+            if self.cfg.clean_image.save:
+                save_images(images, preds, self.clean_image_save_dir,
+                            self.cfg.clean_image.with_bboxes, self.cfg.final_rgb_mode)
+        self.evaluator.evaluate(len(self.test_dataloader.dataset))
+
+    @torch.no_grad()
+    def _eval_adv(self):
+        if self.is_distributed:
+            dist.barrier()
+        self.logger.info('Evaluating detection performance on attacked data...')
+        for i, batch_data in tqdm(enumerate(self.test_dataloader), total=len(self.test_dataloader)):
+            with torch.cuda.amp.autocast(enabled=self.cfg.amp):
+                returned_dict = self.model(batch_data)
+            preds = returned_dict['preds']
+            if self.cfg.adv_image.save:
+                save_images(returned_dict['adv_images'], preds, self.adv_image_save_dir,
+                            self.cfg.adv_image.with_bboxes, self.cfg.final_rgb_mode)
+            self.evaluator.process(data_samples=preds)
+        self.evaluator.evaluate(len(self.test_dataloader.dataset))
+
+    def before_eval(self, eval_on_clean):
+        """Do something before evaluating."""
+        self.model.eval() if not self.is_distributed else self.model.module.eval()
+        self.test_dataloader.sampler.shuffle = False
+        if eval_on_clean:
+            if self.cfg.clean_image.save:
+                self.clean_image_save_dir = os.path.join(self.cfg.log_dir, self.cfg.clean_image.save_folder)
+                mkdirs_if_not_exists(self.clean_image_save_dir)
+        else:
+            if self.cfg.adv_image.save:
+                self.adv_image_save_dir = os.path.join(self.cfg.log_dir, self.cfg.adv_image.save_folder)
+                mkdirs_if_not_exists(self.adv_image_save_dir)
+
     def train(self):
         """Train model."""
         self.before_train()
@@ -45,32 +104,6 @@ class Trainer():
             self.run_epoch()
             self.after_epoch()
         self.after_train()
-
-    @torch.no_grad()
-    def eval(self, eval_on_clean=False):
-        '''Evaluate detection performance.'''
-        self.before_eval()
-        if eval_on_clean:
-            self._eval_clean()
-
-        save_adv_images = self.cfg.adv_image.save
-
-        if save_adv_images:
-            adv_image_save_dir = os.path.join(self.cfg.log_dir, self.cfg.adv_image.save_folder)
-            mkdirs_if_not_exists(adv_image_save_dir)
-        if self.is_distributed:
-            dist.barrier()
-        self.logger.info('Evaluating detection performance on attacked data...')
-        for i, batch_data in tqdm(enumerate(self.test_dataloader), total=len(self.test_dataloader)):
-            with torch.cuda.amp.autocast(enabled=self.cfg.amp):
-                returned_dict = self.model(batch_data)
-            preds = returned_dict['preds']
-            if save_adv_images:
-                save_images(returned_dict['adv_images'], preds, adv_image_save_dir,
-                            self.cfg.adv_image.with_bboxes, self.cfg.final_rgb_mode)
-            self.evaluator.process(data_samples=preds)
-        metrics = self.evaluator.evaluate(len(self.test_dataloader.dataset))
-        return metrics
 
     def run_epoch(self):
         """Train for one epoch."""
@@ -119,29 +152,6 @@ class Trainer():
                 self.logger.info(info)
             t1 = time.time()
         self.runtime['epoch_loss'] = epoch_loss
-
-    @torch.no_grad()
-    def _eval_clean(self):
-        """Evaluate detection performance on clean data."""
-        if self.cfg.clean_image.save:
-            clean_image_save_dir = os.path.join(self.cfg.log_dir, self.cfg.clean_image.save_folder)
-            mkdirs_if_not_exists(clean_image_save_dir)
-
-        self.logger.info('Evaluating detection performance on clean data...')
-        model = self.model.module if self.is_distributed else self.model
-        for i, batch_data in tqdm(enumerate(self.test_dataloader), total=len(self.test_dataloader)):
-            with torch.cuda.amp.autocast(enabled=self.cfg.amp):
-                preds, images = model.bbox_predict(batch_data, return_images=True)
-            self.evaluator.process(data_samples=preds)
-            if self.cfg.clean_image.save:
-                save_images(images, preds, clean_image_save_dir,
-                            self.cfg.clean_image.with_bboxes, self.cfg.final_rgb_mode)
-        self.evaluator.evaluate(len(self.test_dataloader.dataset))
-
-    def before_eval(self):
-        """Do something before evaluating."""
-        self.model.eval() if not self.is_distributed else self.model.module.eval()
-        self.test_dataloader.sampler.shuffle = False
 
     def before_epoch(self):
         """Do something before each training epoch."""

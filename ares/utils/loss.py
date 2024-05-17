@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 from timm.loss import JsdCrossEntropy, BinaryCrossEntropy, LabelSmoothingCrossEntropy, SoftTargetCrossEntropy
 from contextlib import suppress
 from timm.utils import NativeScaler
@@ -55,6 +56,11 @@ def margin_loss(outputs, labels, target_labels, targeted, device):
         j = torch.masked_select(outputs, one_hot_labels.bool())
         cost = -torch.clamp((j-i), min=0)  # -self.kappa=0
     return cost.sum()
+
+def soft_cross_entropy(input, target):
+    log_likelihood = -F.log_softmax(input, dim=1)
+    loss = torch.sum(log_likelihood * target) / input.shape[0]
+    return loss
 
 def resolve_amp(args, _logger):
     '''The function to resolve amp parameters for robust training.'''
