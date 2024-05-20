@@ -14,3 +14,4 @@ imagenetv2/
 detection/.dist_test/
 classification/ckpt/
 imagenet/
+test_extract.py

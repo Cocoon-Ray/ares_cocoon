@@ -4,15 +4,24 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-from ...attack import attack_configs
-from ...utils.loss import soft_cross_entropy
+from ...attack.attack_configs import attack_configs
 from ...utils.registry import registry
 
+def abs_outputs_diff_loss(output, target_outputs_after_softmax):
+    output_after_softmax = nn.Softmax(dim=-1)(output)
+    res = torch.abs(output_after_softmax-target_outputs_after_softmax).sum() / output.shape[0]
+    return res
+
+def soft_cross_entropy(output, target_outputs_after_softmax):
+    log_likelihood = -F.log_softmax(output, dim=1)
+    loss = torch.sum(log_likelihood * target_outputs_after_softmax) / output.shape[0]
+    return loss
 
 def get_distill_loss(criterion, outputs, target_pred_id, target_outputs_after_softmax, weights=[0.5, 0.5]):
     hard_criterion = nn.CrossEntropyLoss()
-    soft_criterion = soft_cross_entropy
+    soft_criterion = abs_outputs_diff_loss
     hard_loss = 0
     soft_loss = 0
     if 'soft' in criterion:
@@ -57,7 +66,18 @@ def get_query_inputs(active_query, model, inputs, labels=None):
     return hard_inputs
 
 def vis_pair_model(student_model, teacher_model, dataloader, gpu=0, vis_title='result', save_dir=None):
+    """
+    This function visualises the difference between the substitute model and threat model.
 
+    Parameters:
+    - student_model (nn.Module): substitute model.
+    - teacher_model (nn.Module): theat model.
+    - dataloader (DataLoader): Visualization requires inference result for combining the distribution of the output.
+    Dataloader provides the input data.
+    - gpu (str | int): device where computation is performed.
+    - vis_title (str): The name of the visualization result for save.
+    - save_dir (str): dir for save.
+    """
     device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
     student_model = student_model.to(device)
     teacher_model = teacher_model.to(device)
@@ -85,8 +105,8 @@ def vis_pair_model(student_model, teacher_model, dataloader, gpu=0, vis_title='r
     teacher_outputs = torch.cat(teacher_outputs, dim=0).cpu()
 
     plt.figure(figsize=(10, 5))
-    plt.hist(student_outputs.numpy().flatten(), bins=50, alpha=0.5, label='Student')
-    plt.hist(teacher_outputs.numpy().flatten(), bins=50, alpha=0.5, label='Teacher')
+    plt.hist(student_outputs.numpy().flatten(), bins=50, alpha=0.8, label='Student')
+    plt.hist(teacher_outputs.numpy().flatten(), bins=50, alpha=0.8, label='Teacher')
     plt.legend()
     plt.title('Output Distribution of Student and Teacher Models')
     save = vis_title+'.png'

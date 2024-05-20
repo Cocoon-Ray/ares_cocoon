@@ -12,9 +12,9 @@ from ares.attack.extraction import extract_model, extract_from_offline_preds
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # data
-    parser.add_argument("--data_dir", type=str, default='/home/xieliuwei/project/ares_cocoon/classification/imagenet/', help="Directory to storage data.")
+    parser.add_argument("--data_dir", type=str, default='/path/to/your/data', help="Directory to storage data.")
     # save
-    parser.add_argument("--save_dir", type=str, default='/home/xieliuwei/project/ares_cocoon/classification/ckpt', help="Directory to save stolen model.")
+    parser.add_argument("--save_dir", type=str, default='/path/to/your/save_dir', help="Directory to save stolen model.")
     
     # attack and model
     parser.add_argument('--criterion', type=str, default='soft', choices=['soft', 'soft_hard', 'hard'], help='The way to compute loss')

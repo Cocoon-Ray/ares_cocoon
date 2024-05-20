@@ -420,16 +420,17 @@ def default_loader(path: str) -> Any:
 class ImageFolder(DatasetFolder):
     """A generic data loader where the images are arranged in this way by default: ::
 
-        root/dog/xxx.png
-        root/dog/xxy.png
-        root/dog/[...]/xxz.png
+        root/0/xxx.png
+        root/0/xxy.png
+        root/0/[...]/xxz.png
 
-        root/cat/123.png
-        root/cat/nsdf3.png
-        root/cat/[...]/asd932_.png
+        root/1/123.png
+        root/1/nsdf3.png
+        root/1/[...]/asd932_.png
 
     This class inherits from :class:`~torchvision.datasets.DatasetFolder` so
-    the same methods can be overridden to customize the dataset.
+    the same methods can be overridden to customize the dataset. 0 and 1 etc 
+    are labels of the images the corresponding dir contains.
 
     Args:
         root (str or ``pathlib.Path``): Root directory path.
@@ -442,11 +443,6 @@ class ImageFolder(DatasetFolder):
             and check if the file is a valid file (used to check of corrupt files)
         allow_empty(bool, optional): If True, empty folders are considered to be valid classes.
             An error is raised on empty folders if False (default).
-
-     Attributes:
-        classes (list): List of the class names sorted alphabetically.
-        class_to_idx (dict): Dict with items (class_name, class_index).
-        imgs (list): List of (image path, class_index) tuples
     """
 
     def __init__(
@@ -471,6 +467,15 @@ class ImageFolder(DatasetFolder):
 
 
 class RecurImageFolder(data.Dataset):
+    """
+    The image folder only returns recursively all the images from the given dir.
+    
+    Args:
+        root (str): Root directory path.
+        transform (callable, optional): A function/transform that takes in a PIL image
+            and returns a transformed version. E.g, ``transforms.RandomCrop``
+    """
+
     def __init__(self, root_dir, transform):
         self.root_dir = root_dir
         self.transform = transform
@@ -496,3 +501,5 @@ class RecurImageFolder(data.Dataset):
         image = self.transform(image)
 
         return image
+    
+__all__ = ['ImageFolder', 'RecurImageFolder']
