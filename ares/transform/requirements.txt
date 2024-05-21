@@ -1,0 +1,2 @@
+PyWavelets
+scikit-image==0.23.2
