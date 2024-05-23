@@ -12,7 +12,7 @@ from ares.utils.logger import setup_logger
 from ares.dataset.imagenet_dataset import ImageNetDataset
 from ares.model import cifar_model_zoo, imagenet_model_zoo
 from torchvision.datasets import CIFAR10
-from ares.attack import attack_configs
+from ares.attack.attack_configs import attack_configs
 
 def get_args_parser():
     parser = argparse.ArgumentParser()
@@ -94,7 +94,7 @@ def main(args):
         top1_m.update(clean_acc.item(), batchsize)
         
         # robust acc
-        adv_images = attacker(images = images, labels = labels, target_labels = None)
+        adv_images = attacker(images, labels = labels, target_labels = None)
         if args.attack_name == 'autoattack':
             if adv_images is None:
                 adv_acc = 0.0

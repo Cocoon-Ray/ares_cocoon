@@ -17,7 +17,15 @@ class PGD(object):
     - Supported distance metric: 1, 2, np.inf.
     - References: https://arxiv.org/abs/1706.06083.
     '''
-    def __init__(self, model, device='cuda', norm=np.inf, eps=4/255, stepsize=1/255, steps=20, loss='ce', target=False):
+    def __init__(self, model, 
+                 device='cuda', 
+                 norm=np.inf, 
+                 eps=4/255, 
+                 stepsize=1/255, 
+                 steps=20, 
+                 loss='ce', 
+                 target=False,
+                 clamp_range=[0., 1.]):
         '''The initialize function for PGD.
 
         Args:
@@ -29,8 +37,9 @@ class PGD(object):
             steps (float): The number of attack iteration.
             loss (str): The loss function.
             target (bool): Conduct target/untarget attack. Defaults to False.
+            clamp_range (list): The range restriction of the inputs and adv outputs. 
         '''
-        self.epsilon = eps
+        self.eps = eps
         self.p = norm
         self.net = model
         self.stepsize = stepsize
@@ -38,64 +47,69 @@ class PGD(object):
         self.loss = loss
         self.target = target
         self.device = device
-    
-    def __call__(self, images=None, labels=None, target_labels=None):
+        self.clamp_range = clamp_range
+
+    def __call__(self, inputs=None, labels=None, target_labels=None, input_mask=None):
         '''This function perform attack on target images with corresponding labels 
         and target labels for target attack.
 
         Args:
-            images (torch.Tensor): The images to be attacked. The images should be torch.Tensor with shape [N, C, H, W] and range [0, 1].
+            inputs (torch.Tensor): The inputs to be attacked. For images, the tensor should be of shape [N, C, H, W] and range [0, 1].
             labels (torch.Tensor): The corresponding labels of the images. The labels should be torch.Tensor with shape [N, ]
             target_labels (torch.Tensor): The target labels for target attack. The labels should be torch.Tensor with shape [N, ]
-
+            input_mask (torch.Tensor): Should be of the same shape as inputs. 0 means ignore that place while attacking. 
+        
         Returns:
             torch.Tensor: Adversarial images with value range [0,1].
 
         '''
-        images, labels = images.to(self.device), labels.to(self.device)
+        batchsize = inputs.shape[0]
+        inputs, labels = inputs.to(self.device), labels.to(self.device)
+        if input_mask == None:
+            input_mask = torch.ones_like(inputs).to(inputs)
+        else:
+            input_mask = input_mask.to(inputs)
         if target_labels is not None:
             target_labels = target_labels.to(self.device)
-        batchsize = images.shape[0]
+        
         # random start
-        delta = torch.rand_like(images)*2*self.epsilon-self.epsilon
+        delta = torch.rand_like(inputs)*2*self.eps-self.eps
         if self.p!=np.inf: # projected into feasible set if needed
             normVal = torch.norm(delta.view(batchsize, -1), self.p, 1)#求范数
-            mask = normVal<=self.epsilon
-            scaling = self.epsilon/normVal
+            mask = normVal<=self.eps
+            scaling = self.eps/normVal
             scaling[mask] = 1
             delta = delta*scaling.view(batchsize, 1, 1, 1)
-        advimage = images+delta
-        
+        adv = inputs + delta
 
         for i in range(self.steps):
-            advimage = advimage.clone().detach().requires_grad_(True) # clone the advimage as the next iteration input
-            
-            netOut = self.net(advimage)
-            
-            loss = loss_adv(self.loss, netOut, labels, target_labels, self.target, self.device)        
-            updates = torch.autograd.grad(loss, [advimage])[0].detach()
+            adv_tensor = adv.clone().detach().requires_grad_(True) # clone the advimage as the next iteration input
+            zero_tensor = torch.zeros_like(adv_tensor).to(adv_tensor)
+            adv = torch.where(input_mask==1, adv_tensor, zero_tensor)
+
+            netOut = self.net(adv)
+            loss = loss_adv(self.loss, netOut, labels, target_labels, self.target, self.device)
+            updates = torch.autograd.grad(loss, [adv_tensor])[0].detach()
             if self.p==np.inf:
                 updates = updates.sign()
             else:
                 normVal = torch.norm(updates.view(batchsize, -1), self.p, 1)
                 updates = updates/normVal.view(batchsize, 1, 1, 1)
             updates = updates*self.stepsize
-            advimage = advimage+updates
+            adv = adv+updates
             # project the disturbed image to feasible set if needed
-            delta = advimage-images
+            delta = adv-inputs
             if self.p==np.inf:
-                delta = torch.clamp(delta, -self.epsilon, self.epsilon)
+                delta = torch.clamp(delta, -self.eps, self.eps)
             else:
                 normVal = torch.norm(delta.view(batchsize, -1), self.p, 1)
-                mask = normVal<=self.epsilon
-                scaling = self.epsilon/normVal
+                mask = normVal<=self.eps
+                scaling = self.eps/normVal
                 scaling[mask] = 1
                 delta = delta*scaling.view(batchsize, 1, 1, 1)
-            advimage = images+delta
-            
-            advimage = torch.clamp(advimage, 0, 1)#cifar10(-1,1)
-            
-        return advimage
+            adv = inputs+delta
+            adv = torch.clamp(adv, *self.clamp_range)
+        return adv
 
     def attack_detection_forward(self, batch_data, excluded_losses, scale_factor=255.0,
                                  object_vanish_only=False):
@@ -115,11 +129,11 @@ class PGD(object):
         images = batch_data['inputs']
         batchsize = len(images)
         # random start
-        delta = torch.rand_like(images) * 2 * self.epsilon - self.epsilon
+        delta = torch.rand_like(images) * 2 * self.eps - self.eps
         if self.p != np.inf:  # projected into feasible set if needed
             normVal = torch.norm(delta.view(batchsize, -1), self.p, 1)  # 求范数
-            mask = normVal <= self.epsilon
-            scaling = self.epsilon / normVal
+            mask = normVal <= self.eps
+            scaling = self.eps / normVal
             scaling[mask] = 1
             delta = delta * scaling.view(batchsize, 1, 1, 1)
 
@@ -160,11 +174,11 @@ class PGD(object):
             # project the disturbed image to feasible set if needed
             delta = advimages - images
             if self.p == np.inf:
-                delta = torch.clamp(delta, -self.epsilon, self.epsilon)
+                delta = torch.clamp(delta, -self.eps, self.eps)
             else:
                 normVal = torch.norm(delta.view(batchsize, -1), self.p, 1)
-                mask = normVal <= self.epsilon
-                scaling = self.epsilon / normVal
+                mask = normVal <= self.eps
+                scaling = self.eps / normVal
                 scaling[mask] = 1
                 delta = delta * scaling.view(batchsize, 1, 1, 1)
 
@@ -173,3 +187,8 @@ class PGD(object):
             advimages = torch.clamp(advimages, 0, 1)
 
         return advimages
+
+    def update_attributes(self, attr_dict):
+        for key, value in attr_dict.items():
+            if hasattr(self, key):
+                setattr(self, key, value)

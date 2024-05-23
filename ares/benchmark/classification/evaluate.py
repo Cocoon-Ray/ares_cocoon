@@ -81,7 +81,7 @@ def evaluate_cifar10_attack(model, data_dir, attack_name, gpu=0):
         images, labels = images.to(device), labels.to(device)
 
         # robust acc
-        adv_images = attacker(images=images, labels=labels, target_labels=None)
+        adv_images = attacker(images, labels=labels, target_labels=None)
         if attack_name == 'autoattack':
             if adv_images is None:
                 adv_acc = 0.0
@@ -214,7 +214,7 @@ def evaluate_dataset_attack(model, data_dir, attack_name, transform=imagenet_tra
         images, labels = images.to(device), labels.to(device)
 
         # robust acc
-        adv_images = attacker(images=images, labels=labels, target_labels=None)
+        adv_images = attacker(images, labels=labels, target_labels=None)
         if attack_name == 'autoattack':
             if adv_images is None:
                 adv_acc = 0.0

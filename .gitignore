@@ -14,4 +14,5 @@ imagenetv2/
 detection/.dist_test/
 classification/ckpt/
 imagenet/
+AudioAttack
 test_extract.py

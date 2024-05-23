@@ -521,3 +521,22 @@ transform_config = {
     'tv_chambolle_denoise_transform': tv_chambolle_denoise_transform,
     'cycle_spin_denoise_transform': cycle_spin_denoise_transform
     }
+
+def combine_random_transform(img, return_params=True):
+    """
+    Args:
+    -img: numpy array of shape (H,W,3), range [0,1]
+    """
+    params_dict = dict()
+    for t_name, t in transform_config.items():
+        if np.random.rand(1) < 0.2:
+            if return_params:
+                img, params = t(img)
+                params_dict[t_name] = params
+            else:
+                img = t(img)
+    assert isinstance(img, np.ndarray) and len(img.shape) == 3 and img.shape[2] == 3 and img.max() <= 1
+    if return_params:
+        return img, params_dict
+    else:
+        return img
