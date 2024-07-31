@@ -41,11 +41,13 @@ class Trainer():
         '''Evaluate detection performance.'''
         if eval_on_clean:
             self.eval_clean()
-        self.eval_adv()
+        metrics = self.eval_adv()
+        return metrics
 
     def eval_adv(self):
         self.before_eval(eval_on_clean=False)
-        self._eval_adv()
+        metrics = self._eval_adv()
+        return metrics
 
     def eval_clean(self):
         self.before_eval(eval_on_clean=True)
@@ -80,7 +82,8 @@ class Trainer():
                 save_images(returned_dict['adv_images'], preds, self.adv_image_save_dir,
                             self.cfg.adv_image.with_bboxes, self.cfg.final_rgb_mode)
             self.evaluator.process(data_samples=preds)
-        self.evaluator.evaluate(len(self.test_dataloader.dataset))
+        metrics = self.evaluator.evaluate(len(self.test_dataloader.dataset))
+        return metrics
 
     def before_eval(self, eval_on_clean):
         """Do something before evaluating."""
